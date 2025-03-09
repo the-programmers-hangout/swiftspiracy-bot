@@ -26,6 +26,9 @@ var conspiraciesFile embed.FS
 var (
 	praises      []string
 	conspiracies []string
+
+	praiseIndex     int
+	conspiracyIndex int
 )
 
 const (
@@ -119,14 +122,16 @@ func startScheduler(s *discordgo.Session, channelID string) {
 
 		// Wait for the randomized time before sending a message
 		time.Sleep(randomDuration)
-		sendMessage(praises, s, channelID)
+		sendMessage(praises[praiseIndex%len(praises)], s, channelID)
+		praiseIndex++
 
 		// Chance to send a conspiracy theory
 		if rand.Float32() < 0.4 {
-			msg := sendMessage(conspiracies, s, channelID)
+			discordMessage := sendMessage(conspiracies[conspiracyIndex%len(conspiracies)], s, channelID)
+			conspiracyIndex++
 
 			// Delete conspiracy after 5 minutes
-			if msg != nil {
+			if discordMessage != nil {
 				go func(msgID string) {
 					time.Sleep(deleteConspiracyDelay)
 					err := s.ChannelMessageDelete(channelID, msgID)
@@ -135,20 +140,14 @@ func startScheduler(s *discordgo.Session, channelID string) {
 					} else {
 						log.Println("[↓] Conspiracy deleted!")
 					}
-				}(msg.ID)
+				}(discordMessage.ID)
 			}
 		}
 	}
 }
 
 // sendMessage sends a random message from a given list
-func sendMessage(messages []string, s *discordgo.Session, channelID string) *discordgo.Message {
-	if len(messages) == 0 {
-		log.Println("[!] No messages available.")
-		return nil
-	}
-	message := messages[rand.Intn(len(messages))]
-
+func sendMessage(message string, s *discordgo.Session, channelID string) *discordgo.Message {
 	discordMessage, err := s.ChannelMessageSend(channelID, message)
 	if err != nil {
 		log.Printf("[x] Error sending message: %v\n", err)
