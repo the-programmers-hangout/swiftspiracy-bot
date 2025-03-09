@@ -104,16 +104,27 @@ func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 
 func sendScheduledMessages(s *discordgo.Session, channelID string) {
 	// TODO: change time after debugging
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		sendMessage(praises, s, channelID)
 
 		// 30% chance to send a conspiracy theory
-		// TODO: and delete it after 5 min
 		if rand.Float32() < 0.3 {
-			sendMessage(conspiracies, s, channelID)
+			discordMessage := sendMessage(conspiracies, s, channelID)
+
+			// schedule message deletion after 5 minutes
+			go func(messageID string) {
+				// TODO: change time after debugging
+				time.Sleep(5 * time.Second)
+				err := s.ChannelMessageDelete(channelID, messageID)
+				if err != nil {
+					fmt.Printf("Error deleting conspiracy: %v\n", err)
+				} else {
+					fmt.Println("Conspiracy deleted!")
+				}
+			}(discordMessage.ID)
 		}
 	}
 }
@@ -129,6 +140,8 @@ func sendMessage(messages []string, s *discordgo.Session, channelID string) *dis
 	if err != nil {
 		fmt.Printf("Error sending message: %v\n", err)
 		return nil
+	} else {
+		fmt.Println("Message sent!")
 	}
 	return discordMessage
 }
