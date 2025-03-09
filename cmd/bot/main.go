@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -13,6 +14,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 )
+
+// Embed JSON files at build time
 
 //go:embed praises.json
 var praisesFile embed.FS
@@ -25,123 +28,123 @@ var (
 	conspiracies []string
 )
 
+const (
+	// TODO: update value after debugging
+	sendMessageInterval = 10 * time.Second
+	// TODO: update value after debugging
+	deleteConspiracyDelay = 5 * time.Second
+)
+
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file")
-		return
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Println("[!] No .env file found, using system environment variables.")
 	}
 
-	botToken := os.Getenv("DISCORD_BOT_TOKEN")
-	channelID := os.Getenv("DISCORD_CHANNEL_ID")
+	// Retrieve token and channel ID
+	botToken, channelID := os.Getenv("DISCORD_BOT_TOKEN"), os.Getenv("DISCORD_CHANNEL_ID")
 	if botToken == "" || channelID == "" {
-		fmt.Println("Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
-		return
+		log.Fatal("[x] Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
 	}
 
-	// load messages at build time
-	err = loadMessages()
-	if err != nil {
-		fmt.Println("Error loading embedded messages: %v", err)
-		return
+	// Load messages at build time
+	if err := loadMessages(); err != nil {
+		log.Fatalf("[x] Error loading messages: %v", err)
 	}
 
-	// initialize bot session
+	// Initialize bot session
 	dg, err := discordgo.New("Bot " + botToken)
 	if err != nil {
-		fmt.Println("Error creating Discord session,", err)
-		return
+		log.Fatalf("[x] Error creating Discord session: %v", err)
 	}
 
-	// open WebSocket connection
+	// Open WebSocket connection
 	dg.AddHandler(readyHandler)
-	err = dg.Open()
-	if err != nil {
-		fmt.Println("Error opening connection,", err)
-		return
+	if err := dg.Open(); err != nil {
+		log.Fatalf("[x] Error opening connection: %v", err)
 	}
+	defer dg.Close()
 
-	// start the scheduled messages
-	go sendScheduledMessages(dg, channelID)
+	// Start the message scheduler
+	go startScheduler(dg, channelID)
 
-	// wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+	// Graceful shutdown handling
+	log.Println("[✓] Swiftspiracy Bot is now running. Press CTRL+C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	// cleanly close down the Discord session
-	dg.Close()
+	log.Println("[↓] Shutting down bot gracefully...")
 }
 
+// loadMessages loads JSON files into memory at build time
 func loadMessages() error {
-	file, err := praisesFile.ReadFile("praises.json")
-	if err != nil {
-		return err
+	var err error
+	if praises, err = loadJSONFromEmbed(praisesFile, "praises.json"); err != nil {
+		return fmt.Errorf("failed to load praises.json: %w", err)
 	}
-
-	err = json.Unmarshal(file, &praises)
-	if err != nil {
-		return err
+	if conspiracies, err = loadJSONFromEmbed(conspiraciesFile, "conspiracies.json"); err != nil {
+		return fmt.Errorf("failed to load conspiracies.json: %w", err)
 	}
-
-	file, err = conspiraciesFile.ReadFile("conspiracies.json")
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(file, &conspiracies)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
-	fmt.Println("Ready to rumble!")
+// loadJSONFromEmbed reads JSON from an embedded file system
+func loadJSONFromEmbed(fs embed.FS, filename string) ([]string, error) {
+	data, err := fs.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	var messages []string
+	if err := json.Unmarshal(data, &messages); err != nil {
+		return nil, err
+	}
+	return messages, nil
 }
 
-func sendScheduledMessages(s *discordgo.Session, channelID string) {
-	// TODO: change time after debugging
-	ticker := time.NewTicker(time.Second * 10)
+// readyHandler confirms the bot is online
+func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
+	log.Println("[✓] Swiftspiracy Bot is online and ready!")
+}
+
+// startScheduler handles sending messages at intervals
+func startScheduler(s *discordgo.Session, channelID string) {
+	ticker := time.NewTicker(sendMessageInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		sendMessage(praises, s, channelID)
 
-		// 30% chance to send a conspiracy theory
-		if rand.Float32() < 0.3 {
-			discordMessage := sendMessage(conspiracies, s, channelID)
+		//Chance to send a conspiracy theory
+		if rand.Float32() < 0.4 {
+			msg := sendMessage(conspiracies, s, channelID)
 
-			// schedule message deletion after 5 minutes
-			go func(messageID string) {
-				// TODO: change time after debugging
-				time.Sleep(5 * time.Second)
-				err := s.ChannelMessageDelete(channelID, messageID)
-				if err != nil {
-					fmt.Printf("Error deleting conspiracy: %v\n", err)
-				} else {
-					fmt.Println("Conspiracy deleted!")
-				}
-			}(discordMessage.ID)
+			// Delete conspiracy after 5 minutes
+			if msg != nil {
+				go func(msgID string) {
+					time.Sleep(deleteConspiracyDelay)
+					err := s.ChannelMessageDelete(channelID, msgID)
+					if err != nil {
+						log.Printf("[!] Error deleting conspiracy: %v\n", err)
+					}
+				}(msg.ID)
+			}
 		}
 	}
 }
 
+// sendMessage sends a random message from a given list
 func sendMessage(messages []string, s *discordgo.Session, channelID string) *discordgo.Message {
 	if len(messages) == 0 {
-		fmt.Printf("No messages available.")
+		log.Println("[!] No messages available.")
 		return nil
 	}
 	message := messages[rand.Intn(len(messages))]
 
 	discordMessage, err := s.ChannelMessageSend(channelID, message)
 	if err != nil {
-		fmt.Printf("Error sending message: %v\n", err)
+		log.Printf("[x] Error sending message: %v\n", err)
 		return nil
-	} else {
-		fmt.Println("Message sent!")
 	}
 	return discordMessage
 }
