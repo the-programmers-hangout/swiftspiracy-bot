@@ -30,7 +30,11 @@ var (
 
 const (
 	// TODO: update value after debugging
-	sendMessageInterval = 10 * time.Second
+	sendMessageIntervalMin = 10
+	// TODO: update value after debugging
+	sendMessageIntervalMax = 20
+	// TODO: update value after debugging
+	sendMessageUnit = time.Second
 	// TODO: update value after debugging
 	deleteConspiracyDelay = 5 * time.Second
 )
@@ -109,13 +113,15 @@ func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 
 // startScheduler handles sending messages at intervals
 func startScheduler(s *discordgo.Session, channelID string) {
-	ticker := time.NewTicker(sendMessageInterval)
-	defer ticker.Stop()
+	for {
+		randomDuration := time.Duration(rand.Intn(sendMessageIntervalMin)+(sendMessageIntervalMax-sendMessageIntervalMin)) * sendMessageUnit
+		log.Printf("[!] Next message in %v", randomDuration)
 
-	for range ticker.C {
+		// Wait for the randomized time before sending a message
+		time.Sleep(randomDuration)
 		sendMessage(praises, s, channelID)
 
-		//Chance to send a conspiracy theory
+		// Chance to send a conspiracy theory
 		if rand.Float32() < 0.4 {
 			msg := sendMessage(conspiracies, s, channelID)
 
@@ -126,6 +132,8 @@ func startScheduler(s *discordgo.Session, channelID string) {
 					err := s.ChannelMessageDelete(channelID, msgID)
 					if err != nil {
 						log.Printf("[!] Error deleting conspiracy: %v\n", err)
+					} else {
+						log.Println("[↓] Conspiracy deleted!")
 					}
 				}(msg.ID)
 			}
