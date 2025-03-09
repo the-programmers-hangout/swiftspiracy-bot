@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -102,14 +103,32 @@ func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 }
 
 func sendScheduledMessages(s *discordgo.Session, channelID string) {
-	ticker := time.NewTicker(30 * time.Second)
+	// TODO: change time after debugging
+	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		message := "Good"
-		_, err := s.ChannelMessageSend(channelID, message)
-		if err != nil {
-			fmt.Printf("Error sending message: %v\n", err)
+		sendMessage(praises, s, channelID)
+
+		// 30% chance to send a conspiracy theory
+		// TODO: and delete it after 5 min
+		if rand.Float32() < 0.3 {
+			sendMessage(conspiracies, s, channelID)
 		}
 	}
+}
+
+func sendMessage(messages []string, s *discordgo.Session, channelID string) *discordgo.Message {
+	if len(messages) == 0 {
+		fmt.Printf("No messages available.")
+		return nil
+	}
+	message := messages[rand.Intn(len(messages))]
+
+	discordMessage, err := s.ChannelMessageSend(channelID, message)
+	if err != nil {
+		fmt.Printf("Error sending message: %v\n", err)
+		return nil
+	}
+	return discordMessage
 }
