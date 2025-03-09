@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -18,8 +19,9 @@ func main() {
 	}
 
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
-	if botToken == "" {
-		fmt.Println("Missing variable in .env")
+	channelID := os.Getenv("DISCORD_CHANNEL_ID")
+	if botToken == "" || channelID == "" {
+		fmt.Println("Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
 		return
 	}
 
@@ -32,12 +34,14 @@ func main() {
 
 	// open WebSocket connection
 	dg.AddHandler(readyHandler)
-	dg.AddHandler(messageCreate)
 	err = dg.Open()
 	if err != nil {
 		fmt.Println("Error opening connection,", err)
 		return
 	}
+
+	// start the scheduled messages
+	go sendScheduledMessages(dg, channelID)
 
 	// wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -53,26 +57,15 @@ func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 	fmt.Println("Ready to rumble!")
 }
 
-// This function will be called (due to AddHandler above) every time a new
-// message is created on any channel that the authenticated bot has access to.
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func sendScheduledMessages(s *discordgo.Session, channelID string) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
-	// Ignore all messages created by the bot itself
-	// This isn't required in this specific example but it's a good practice.
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	// Ugh message is blank, must be some weird intents thing?
-	fmt.Println(m.Author.Username + " sent: " + m.Content)
-
-	// If the message is "ping" reply with "Pong!"
-	if m.Content == "ping" {
-		s.ChannelMessageSend(m.ChannelID, "Pong!")
-	}
-
-	// If the message is "pong" reply with "Ping!"
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
+	for range ticker.C {
+		message := "Good"
+		_, err := s.ChannelMessageSend(channelID, message)
+		if err != nil {
+			fmt.Printf("Error sending message: %v\n", err)
+		}
 	}
 }
