@@ -132,18 +132,7 @@ func startScheduler(s *discordgo.Session, channelID string) {
 			discordMessage := sendMessage(conspiracies[conspiracyIndex%len(conspiracies)], s, channelID)
 			conspiracyIndex++
 
-			// Delete conspiracy after 5 minutes
-			if discordMessage != nil {
-				go func(msgID string) {
-					time.Sleep(DeleteConspiracyDelay)
-					err := s.ChannelMessageDelete(channelID, msgID)
-					if err != nil {
-						log.Printf("[!] Error deleting conspiracy: %v\n", err)
-					} else {
-						log.Println("[↓] Conspiracy deleted!")
-					}
-				}(discordMessage.ID)
-			}
+			go deleteMessageAfterDelay(discordMessage, s, channelID)
 		}
 	}
 }
@@ -156,4 +145,19 @@ func sendMessage(message string, s *discordgo.Session, channelID string) *discor
 		return nil
 	}
 	return discordMessage
+}
+
+// deleteMessageAfterDelay deletes the message after a given delay
+func deleteMessageAfterDelay(discordMessage *discordgo.Message, s *discordgo.Session, channelID string) {
+	if discordMessage == nil {
+		return
+	}
+
+	time.Sleep(DeleteConspiracyDelay)
+	err := s.ChannelMessageDelete(channelID, discordMessage.ID)
+	if err != nil {
+		log.Printf("[!] Error deleting conspiracy: %v\n", err)
+	} else {
+		log.Println("[↓] Conspiracy deleted!")
+	}
 }
