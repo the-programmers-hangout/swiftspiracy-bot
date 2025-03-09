@@ -118,10 +118,9 @@ func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 
 // startScheduler handles sending messages at intervals
 func startScheduler(s *discordgo.Session, channelID string) {
-	for {
-		randomDuration := time.Duration(rand.Intn(SendMessageIntervalMin)+(SendMessageIntervalMax-SendMessageIntervalMin)) * SendMessageUnit
-		log.Printf("[!] Next message in %v", randomDuration)
+	randomDuration := 0 * time.Second
 
+	for {
 		// Wait for the randomized time before sending a message
 		time.Sleep(randomDuration)
 		sendMessage(praises[praiseIndex%len(praises)], s, channelID)
@@ -134,6 +133,9 @@ func startScheduler(s *discordgo.Session, channelID string) {
 
 			go deleteMessageAfterDelay(discordMessage, s, channelID)
 		}
+
+		randomDuration = time.Duration(rand.Intn(SendMessageIntervalMin)+(SendMessageIntervalMax-SendMessageIntervalMin)) * SendMessageUnit
+		log.Printf("[!] Next message in %v", randomDuration)
 	}
 }
 
