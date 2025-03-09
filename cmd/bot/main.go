@@ -134,7 +134,7 @@ func startScheduler(s *discordgo.Session, channelID string) {
 			go deleteMessageAfterDelay(discordMessage, s, channelID)
 		}
 
-		randomDuration = time.Duration(rand.Intn(SendMessageIntervalMin)+(SendMessageIntervalMax-SendMessageIntervalMin)) * SendMessageUnit
+		randomDuration = time.Duration(rand.Intn(SendMessageIntervalMax-SendMessageIntervalMin)+(SendMessageIntervalMin)) * SendMessageUnit
 		log.Printf("[!] Next message in %v", randomDuration)
 	}
 }
