@@ -1,6 +1,8 @@
 package main
 
 import (
+	"embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,6 +11,17 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+)
+
+//go:embed praises.json
+var praisesFile embed.FS
+
+//go:embed conspiracies.json
+var conspiraciesFile embed.FS
+
+var (
+	praises      []string
+	conspiracies []string
 )
 
 func main() {
@@ -22,6 +35,13 @@ func main() {
 	channelID := os.Getenv("DISCORD_CHANNEL_ID")
 	if botToken == "" || channelID == "" {
 		fmt.Println("Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
+		return
+	}
+
+	// load messages at build time
+	err = loadMessages()
+	if err != nil {
+		fmt.Println("Error loading embedded messages: %v", err)
 		return
 	}
 
@@ -51,6 +71,30 @@ func main() {
 
 	// cleanly close down the Discord session
 	dg.Close()
+}
+
+func loadMessages() error {
+	file, err := praisesFile.ReadFile("praises.json")
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(file, &praises)
+	if err != nil {
+		return err
+	}
+
+	file, err = conspiraciesFile.ReadFile("conspiracies.json")
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(file, &conspiracies)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
