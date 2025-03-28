@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -31,18 +32,54 @@ var (
 	conspiracyIndex int
 )
 
-const (
-	// TODO: update value after debugging
-	SendMessageIntervalMin = 5
-	// TODO: update value after debugging
-	SendMessageIntervalMax = 10
-	// TODO: update value after debugging
-	SendMessageUnit = time.Second
-	// TODO: update value after debugging
-	DeleteConspiracyDelay = 3 * time.Second
-	// TODO: update value after debugging
-	ConspiracyProbability = 0.4
+var (
+	SendMessageIntervalMin int
+	SendMessageIntervalMax int
+	SendMessageUnit        time.Duration
+	DeleteConspiracyDelay  time.Duration
+	ConspiracyProbability  float64
 )
+
+func loadEnvConfig() error {
+	var err error
+
+	// Message intervals
+	SendMessageIntervalMin, err = strconv.Atoi(os.Getenv("SEND_MESSAGE_INTERVAL_MIN"))
+	if err != nil {
+		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MIN: %w", err)
+	}
+	SendMessageIntervalMax, err = strconv.Atoi(os.Getenv("SEND_MESSAGE_INTERVAL_MAX"))
+	if err != nil {
+		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MAX: %w", err)
+	}
+
+	// Duration unit
+	unit := os.Getenv("SEND_MESSAGE_UNIT")
+	switch unit {
+	case "second", "seconds":
+		SendMessageUnit = time.Second
+	case "minute", "minutes":
+		SendMessageUnit = time.Minute
+	case "millisecond", "milliseconds":
+		SendMessageUnit = time.Millisecond
+	default:
+		return fmt.Errorf("unsupported SEND_MESSAGE_UNIT: %s", unit)
+	}
+
+	// Conspiracy delete delay
+	DeleteConspiracyDelay, err = time.ParseDuration(os.Getenv("DELETE_CONSPIRACY_DELAY"))
+	if err != nil {
+		return fmt.Errorf("DELETE_CONSPIRACY_DELAY: %w", err)
+	}
+
+	// Conspiracy probability
+	ConspiracyProbability, err = strconv.ParseFloat(os.Getenv("CONSPIRACY_PROBABILITY"), 64)
+	if err != nil {
+		return fmt.Errorf("CONSPIRACY_PROBABILITY: %w", err)
+	}
+
+	return nil
+}
 
 func main() {
 	// Load environment variables
@@ -54,6 +91,10 @@ func main() {
 	botToken, channelID := os.Getenv("DISCORD_BOT_TOKEN"), os.Getenv("DISCORD_CHANNEL_ID")
 	if botToken == "" || channelID == "" {
 		log.Fatal("[x] Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
+	}
+
+	if err := loadEnvConfig(); err != nil {
+		log.Fatalf("[x] Error loading env config: %v", err)
 	}
 
 	// Load messages at build time
@@ -127,7 +168,7 @@ func startScheduler(s *discordgo.Session, channelID string) {
 		praiseIndex++
 
 		// Chance to send a conspiracy theory
-		if rand.Float32() < ConspiracyProbability {
+		if rand.Float64() < ConspiracyProbability {
 			discordMessage := sendMessage(conspiracies[conspiracyIndex%len(conspiracies)], s, channelID)
 			conspiracyIndex++
 
