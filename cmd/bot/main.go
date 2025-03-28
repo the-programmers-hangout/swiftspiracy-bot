@@ -33,6 +33,11 @@ var (
 )
 
 var (
+	botToken  string
+	channelID string
+)
+
+var (
 	SendMessageIntervalMin int
 	SendMessageIntervalMax int
 	SendMessageUnit        time.Duration
@@ -41,9 +46,21 @@ var (
 )
 
 func loadEnvConfig() error {
+	if err := godotenv.Load(); err != nil {
+		log.Println("[!] No .env file found, using system environment variables.")
+	}
+
+	botToken = os.Getenv("DISCORD_BOT_TOKEN")
+	if botToken == "" {
+		return fmt.Errorf("Missing DISCORD_BOT_TOKEN")
+	}
+	channelID = os.Getenv("DISCORD_CHANNEL_ID")
+	if botToken == "" {
+		return fmt.Errorf("Missing DISCORD_CHANNEL_ID")
+	}
+
 	var err error
 
-	// Message intervals
 	SendMessageIntervalMin, err = strconv.Atoi(os.Getenv("SEND_MESSAGE_INTERVAL_MIN"))
 	if err != nil {
 		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MIN: %w", err)
@@ -53,9 +70,7 @@ func loadEnvConfig() error {
 		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MAX: %w", err)
 	}
 
-	// Duration unit
-	unit := os.Getenv("SEND_MESSAGE_UNIT")
-	switch unit {
+	switch os.Getenv("SEND_MESSAGE_UNIT") {
 	case "second", "seconds":
 		SendMessageUnit = time.Second
 	case "minute", "minutes":
@@ -63,16 +78,14 @@ func loadEnvConfig() error {
 	case "millisecond", "milliseconds":
 		SendMessageUnit = time.Millisecond
 	default:
-		return fmt.Errorf("unsupported SEND_MESSAGE_UNIT: %s", unit)
+		return fmt.Errorf("unsupported SEND_MESSAGE_UNIT: %s", os.Getenv("SEND_MESSAGE_UNIT"))
 	}
 
-	// Conspiracy delete delay
 	DeleteConspiracyDelay, err = time.ParseDuration(os.Getenv("DELETE_CONSPIRACY_DELAY"))
 	if err != nil {
 		return fmt.Errorf("DELETE_CONSPIRACY_DELAY: %w", err)
 	}
 
-	// Conspiracy probability
 	ConspiracyProbability, err = strconv.ParseFloat(os.Getenv("CONSPIRACY_PROBABILITY"), 64)
 	if err != nil {
 		return fmt.Errorf("CONSPIRACY_PROBABILITY: %w", err)
@@ -82,19 +95,8 @@ func loadEnvConfig() error {
 }
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("[!] No .env file found, using system environment variables.")
-	}
-
-	// Retrieve token and channel ID
-	botToken, channelID := os.Getenv("DISCORD_BOT_TOKEN"), os.Getenv("DISCORD_CHANNEL_ID")
-	if botToken == "" || channelID == "" {
-		log.Fatal("[x] Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
-	}
-
 	if err := loadEnvConfig(); err != nil {
-		log.Fatalf("[x] Error loading env config: %v", err)
+		log.Fatalf("[x] Failed to load configuration: %v", err)
 	}
 
 	// Load messages at build time
