@@ -54,6 +54,20 @@
               value = "experimental-features = nix-command flakes";
             }
           ];
+          commands = [
+            {
+              name = "fmt";
+              help = "format nix code (using alejandra)";
+              command = "nix fmt";
+              category = "nix";
+            }
+            {
+              name = "lint";
+              help = "lint go code";
+              command = "gofmt";
+              category = "golang";
+            }
+          ];
         };
       };
     };
