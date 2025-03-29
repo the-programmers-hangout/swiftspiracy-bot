@@ -26,3 +26,12 @@ You can view the [.env-sample](./.env-sample) as an example.
 ## Notes
 
 - The bot gracefully shuts down on CTRL+C.
+
+### If using nix
+
+*and if you are NOT using direnv*
+At the project root directory, run:
+`nix develop` and you'll have a development shell with the `go.mod` specified version of Golang (1.23.4 as of writing)
+And if you're a chad, using direnv, you'll automatically load the environment when you `cd` into the project.
+
+The flake also comes with **pre commit hooks** that will be run automatically when running `nix flake check`, it can also be extended to run arbitrary tests.
