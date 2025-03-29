@@ -25,25 +25,62 @@ var praisesFile embed.FS
 var conspiraciesFile embed.FS
 
 var (
+	// messages sourced from the embedded files
 	praises      []string
 	conspiracies []string
 
+	// internally track which messages have been sent
 	praiseIndex     int
 	conspiracyIndex int
 )
 
+// Settings for bot sourced from env variables
 var (
 	botToken  string
 	channelID string
-)
 
-var (
 	SendMessageIntervalMin int
 	SendMessageIntervalMax int
 	SendMessageUnit        time.Duration
-	DeleteConspiracyDelay  time.Duration
-	ConspiracyProbability  float64
+
+	DeleteConspiracyDelay time.Duration
+	ConspiracyProbability float64
 )
+
+func main() {
+	if err := loadEnvConfig(); err != nil {
+		log.Fatalf("[x] Failed to load configuration: %v", err)
+	}
+
+	// Load messages at build time
+	if err := loadMessages(); err != nil {
+		log.Fatalf("[x] Error loading messages: %v", err)
+	}
+
+	// Initialize bot session
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		log.Fatalf("[x] Error creating Discord session: %v", err)
+	}
+
+	// Open WebSocket connection
+	dg.AddHandler(readyHandler)
+	if err := dg.Open(); err != nil {
+		log.Fatalf("[x] Error opening connection: %v", err)
+	}
+	defer dg.Close()
+
+	// Start the message scheduler
+	go startScheduler(dg, channelID)
+
+	// Graceful shutdown handling
+	log.Println("[✓] Swiftspiracy Bot is now running. Press CTRL+C to exit.")
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-sc
+
+	log.Println("[↓] Shutting down bot gracefully...")
+}
 
 func loadEnvConfig() error {
 	if err := godotenv.Load(); err != nil {
@@ -92,41 +129,6 @@ func loadEnvConfig() error {
 	}
 
 	return nil
-}
-
-func main() {
-	if err := loadEnvConfig(); err != nil {
-		log.Fatalf("[x] Failed to load configuration: %v", err)
-	}
-
-	// Load messages at build time
-	if err := loadMessages(); err != nil {
-		log.Fatalf("[x] Error loading messages: %v", err)
-	}
-
-	// Initialize bot session
-	dg, err := discordgo.New("Bot " + botToken)
-	if err != nil {
-		log.Fatalf("[x] Error creating Discord session: %v", err)
-	}
-
-	// Open WebSocket connection
-	dg.AddHandler(readyHandler)
-	if err := dg.Open(); err != nil {
-		log.Fatalf("[x] Error opening connection: %v", err)
-	}
-	defer dg.Close()
-
-	// Start the message scheduler
-	go startScheduler(dg, channelID)
-
-	// Graceful shutdown handling
-	log.Println("[✓] Swiftspiracy Bot is now running. Press CTRL+C to exit.")
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sc
-
-	log.Println("[↓] Shutting down bot gracefully...")
 }
 
 // loadMessages loads JSON files into memory at build time
