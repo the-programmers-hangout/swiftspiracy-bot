@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -31,29 +32,71 @@ var (
 	conspiracyIndex int
 )
 
-const (
-	// TODO: update value after debugging
-	SendMessageIntervalMin = 5
-	// TODO: update value after debugging
-	SendMessageIntervalMax = 10
-	// TODO: update value after debugging
-	SendMessageUnit = time.Second
-	// TODO: update value after debugging
-	DeleteConspiracyDelay = 3 * time.Second
-	// TODO: update value after debugging
-	ConspiracyProbability = 0.4
+var (
+	botToken  string
+	channelID string
 )
 
-func main() {
-	// Load environment variables
+var (
+	SendMessageIntervalMin int
+	SendMessageIntervalMax int
+	SendMessageUnit        time.Duration
+	DeleteConspiracyDelay  time.Duration
+	ConspiracyProbability  float64
+)
+
+func loadEnvConfig() error {
 	if err := godotenv.Load(); err != nil {
 		log.Println("[!] No .env file found, using system environment variables.")
 	}
 
-	// Retrieve token and channel ID
-	botToken, channelID := os.Getenv("DISCORD_BOT_TOKEN"), os.Getenv("DISCORD_CHANNEL_ID")
-	if botToken == "" || channelID == "" {
-		log.Fatal("[x] Missing DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID in .env")
+	botToken = os.Getenv("DISCORD_BOT_TOKEN")
+	if botToken == "" {
+		return fmt.Errorf("Missing DISCORD_BOT_TOKEN")
+	}
+	channelID = os.Getenv("DISCORD_CHANNEL_ID")
+	if botToken == "" {
+		return fmt.Errorf("Missing DISCORD_CHANNEL_ID")
+	}
+
+	var err error
+
+	SendMessageIntervalMin, err = strconv.Atoi(os.Getenv("SEND_MESSAGE_INTERVAL_MIN"))
+	if err != nil {
+		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MIN: %w", err)
+	}
+	SendMessageIntervalMax, err = strconv.Atoi(os.Getenv("SEND_MESSAGE_INTERVAL_MAX"))
+	if err != nil {
+		return fmt.Errorf("SEND_MESSAGE_INTERVAL_MAX: %w", err)
+	}
+
+	switch os.Getenv("SEND_MESSAGE_UNIT") {
+	case "second", "seconds":
+		SendMessageUnit = time.Second
+	case "minute", "minutes":
+		SendMessageUnit = time.Minute
+	case "millisecond", "milliseconds":
+		SendMessageUnit = time.Millisecond
+	default:
+		return fmt.Errorf("unsupported SEND_MESSAGE_UNIT: %s", os.Getenv("SEND_MESSAGE_UNIT"))
+	}
+
+	DeleteConspiracyDelay, err = time.ParseDuration(os.Getenv("DELETE_CONSPIRACY_DELAY"))
+	if err != nil {
+		return fmt.Errorf("DELETE_CONSPIRACY_DELAY: %w", err)
+	}
+
+	ConspiracyProbability, err = strconv.ParseFloat(os.Getenv("CONSPIRACY_PROBABILITY"), 64)
+	if err != nil {
+		return fmt.Errorf("CONSPIRACY_PROBABILITY: %w", err)
+	}
+
+	return nil
+}
+
+func main() {
+	if err := loadEnvConfig(); err != nil {
+		log.Fatalf("[x] Failed to load configuration: %v", err)
 	}
 
 	// Load messages at build time
@@ -127,7 +170,7 @@ func startScheduler(s *discordgo.Session, channelID string) {
 		praiseIndex++
 
 		// Chance to send a conspiracy theory
-		if rand.Float32() < ConspiracyProbability {
+		if rand.Float64() < ConspiracyProbability {
 			discordMessage := sendMessage(conspiracies[conspiracyIndex%len(conspiracies)], s, channelID)
 			conspiracyIndex++
 
