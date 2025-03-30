@@ -1,9 +1,6 @@
 {
-  description = "A basic gomod2nix flake with pre-commit hooks";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    gomod2nix.url = "github:nix-community/gomod2nix";
     flake-parts.url = "github:hercules-ci/flake-parts";
     devshell.url = "github:numtide/devshell";
     git-hooks.url = "github:cachix/git-hooks.nix";
