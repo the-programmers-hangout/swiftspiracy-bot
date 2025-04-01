@@ -43,7 +43,7 @@ Optional:
 - `CONSPIRACY_INDEX`: Index of the [conspiracies.json](./cmd/bot/conspiracies.json) to start from, useful when resuming
   bot.
 
-You can view the [.env-sample](./.env-sample) as an example completed template.
+You can view the [.env.sample](./.env.sample) as an example completed template.
 
 ### Install + Run
 
