@@ -154,6 +154,25 @@ func loadEnvConfig() error {
 		return fmt.Errorf("CONSPIRACY_PROBABILITY: %w", err)
 	}
 
+	// Get values in case of resuming at an index
+	praiseIndex = 0
+	if valStr := os.Getenv("PRAISE_INDEX"); valStr != "" {
+		praiseIndex, err = strconv.Atoi(valStr)
+		if err != nil {
+			log.Printf("[!] Warning: %s is not a valid int, using default %d", "PRAISE_INDEX", 0)
+			praiseIndex = 0
+		}
+	}
+
+	conspiracyIndex = 0
+	if valStr := os.Getenv("CONSPIRACY_INDEX"); valStr != "" {
+		conspiracyIndex, err = strconv.Atoi(valStr)
+		if err != nil {
+			log.Printf("[!] Warning: %s is not a valid int, using default %d", "CONSPIRACY_INDEX", 0)
+			conspiracyIndex = 0
+		}
+	}
+
 	return nil
 }
 
