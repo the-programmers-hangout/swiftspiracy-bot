@@ -38,7 +38,12 @@ Create a `.env` file in the root of your project with the following keys:
 - `CONSPIRACY_PROBABILITY`: Probability (from 0.0 to 1.0) that a conspiracy message is sent after a praise. Eg, 0.4 =
   40% chance.
 
-You can view the [.env-sample](./.env-sample) as an example completed template.
+Optional:
+- `PRAISE_INDEX`: Index of the [praises.json](./cmd/bot/praises.json) to start from, useful when resuming bot.
+- `CONSPIRACY_INDEX`: Index of the [conspiracies.json](./cmd/bot/conspiracies.json) to start from, useful when resuming
+  bot.
+
+You can view the [.env.sample](./.env.sample) as an example completed template.
 
 ### Install + Run
 

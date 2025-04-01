@@ -16,6 +16,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var (
+	// CommitHash and BuildData get replaced during build with the commit hash and time of build.
+	CommitHash string
+	BuildDate  string
+	// StartTime is reset every time the application is restarted
+	StartTime = time.Now()
+)
+
 // Embed JSON files at build time
 
 //go:embed praises.json
@@ -63,12 +71,30 @@ func main() {
 		log.Fatalf("[x] Error creating Discord session: %v", err)
 	}
 
-	// Open WebSocket connection
 	dg.AddHandler(readyHandler)
+	interactionHandlers := make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate))
+	for _, interaction := range interactions {
+		interactionHandlers[interaction.command.Name] = interaction.handler
+	}
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := interactionHandlers[i.ApplicationCommandData().Name]; ok {
+			h(s, i)
+		}
+	})
+
+	// Open WebSocket connection
 	if err := dg.Open(); err != nil {
 		log.Fatalf("[x] Error opening connection: %v", err)
 	}
 	defer dg.Close()
+
+	for _, entry := range interactions {
+		created, err := dg.ApplicationCommandCreate(dg.State.User.ID, "", entry.command)
+		if err != nil {
+			log.Fatalf("Cannot create '%s' command: %v", entry.command.Name, err)
+		}
+		interactionHandlers[created.Name] = entry.handler
+	}
 
 	// Start the message scheduler
 	go startScheduler(dg, channelID)
@@ -128,6 +154,25 @@ func loadEnvConfig() error {
 		return fmt.Errorf("CONSPIRACY_PROBABILITY: %w", err)
 	}
 
+	// Get values in case of resuming at an index
+	praiseIndex = 0
+	if valStr := os.Getenv("PRAISE_INDEX"); valStr != "" {
+		praiseIndex, err = strconv.Atoi(valStr)
+		if err != nil {
+			log.Printf("[!] Warning: %s is not a valid int, using default %d", "PRAISE_INDEX", 0)
+			praiseIndex = 0
+		}
+	}
+
+	conspiracyIndex = 0
+	if valStr := os.Getenv("CONSPIRACY_INDEX"); valStr != "" {
+		conspiracyIndex, err = strconv.Atoi(valStr)
+		if err != nil {
+			log.Printf("[!] Warning: %s is not a valid int, using default %d", "CONSPIRACY_INDEX", 0)
+			conspiracyIndex = 0
+		}
+	}
+
 	return nil
 }
 
@@ -159,6 +204,37 @@ func loadJSONFromEmbed(fs embed.FS, filename string) ([]string, error) {
 // readyHandler confirms the bot is online
 func readyHandler(s *discordgo.Session, r *discordgo.Ready) {
 	log.Println("[✓] Swiftspiracy Bot is online and ready!")
+}
+
+var interactions = []struct {
+	command *discordgo.ApplicationCommand
+	handler func(s *discordgo.Session, i *discordgo.InteractionCreate)
+}{
+	{
+		command: &discordgo.ApplicationCommand{
+			Name:        "buildinfo",
+			Description: "Get the bot's build info and uptime",
+		},
+		handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			uptime := time.Since(StartTime).Round(time.Second)
+			response := fmt.Sprintf(
+				":tools: Build Info:\n- Commit Hash: `%s`\n- Build Date: `%s`\n- Uptime: `%s`",
+				CommitHash,
+				BuildDate,
+				uptime,
+			)
+			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Flags:   discordgo.MessageFlagsEphemeral,
+					Content: response,
+				},
+			})
+			if err != nil {
+				log.Printf("[x] Failed to respond to interaction: %v", err)
+			}
+		},
+	},
 }
 
 // startScheduler handles sending messages at intervals

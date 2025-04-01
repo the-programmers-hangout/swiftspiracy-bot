@@ -15,7 +15,7 @@ MAKEFLAGS += --no-builtin-rules
 
 # VARIABLES
 GIT_COMMIT = $(shell git rev-parse --verify HEAD)
-BUILD_DATE = $(shell date +”%Y.%m.%d.%H%M%S”)
+BUILD_DATE = $(shell date +%Y.%m.%d.%H%M%S)
 
 GOSERVICES = $(sort $(notdir $(realpath $(dir $(wildcard ./cmd/*/main.go)))))
 
